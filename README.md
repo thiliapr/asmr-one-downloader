@@ -15,7 +15,7 @@ pip install -r requirements.txt
 ## 使用示例
 ```bash
 # 获取音声的文件清单
-python fetch_index.py 309477
+python download_asmr.py 309477
 
 # 输入后，等会你应该能看到一个文本编辑器窗口，要求你删除不想下载的项目（注：`#`开头的行为注释，不用管它）
 # 删完后，保存并退出编辑器，然后程序就会开始下载
