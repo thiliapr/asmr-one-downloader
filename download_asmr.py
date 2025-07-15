@@ -15,14 +15,15 @@ from typing import Optional
 import orjson
 
 
-def get_by_curl(
+def request_by_curl(
     url: str,
     doh_url: str,
     save_to_file: Optional[pathlib.Path] = None,
     show_progress: bool = False,
     proxy: Optional[str] = None,
     timeout: Optional[float] = None,
-    curl_path: Optional[pathlib.Path] = None
+    curl_path: Optional[pathlib.Path] = None,
+    args: Optional[list[str]] = None
 ) -> bytes:
     """
     使用 curl 命令获取指定 URL 的内容。
@@ -35,6 +36,7 @@ def get_by_curl(
         proxy: 代理地址，格式为 {protocol}://{host}:{port}。
         timeout: 超时时间，单位为秒。
         curl_path: curl 命令路径，如果为 None，则使用系统默认的 curl。
+        args: 可选的其他 curl 参数。
 
     Returns:
         获取到的内容字节串。
@@ -70,6 +72,10 @@ def get_by_curl(
     # 添加超时时间设置
     if timeout:
         cmd.extend(["--connect-timeout", str(timeout)])
+
+    # 如果提供了额外的 curl 参数，则添加到命令中
+    if args:
+        cmd.extend(args)
 
     # 执行 curl 命令并返回输出
     return subprocess.check_output(cmd)
@@ -127,10 +133,10 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main(args: argparse.Namespace):
     # 使用 partial 函数预设参数，方便后续调用
-    fast_get = partial(get_by_curl, doh_url=args.doh_url, proxy=args.proxy, timeout=args.timeout, curl_path=args.curl_path)
+    fast_curl = partial(request_by_curl, doh_url=args.doh_url, proxy=args.proxy, timeout=args.timeout, curl_path=args.curl_path)
 
     # 获取音声信息
-    work_info = orjson.loads(fast_get(f"{args.endpoint}/api/workInfo/{args.rj_id}"))
+    work_info = orjson.loads(fast_curl(f"{args.endpoint}/api/workInfo/{args.rj_id}"))
 
     # 打印音声信息
     print("音声信息:")
@@ -145,7 +151,7 @@ def main(args: argparse.Namespace):
     # 获取音声目录结构
     directory = {
         "type": "folder",
-        "children": orjson.loads(fast_get(f"{args.endpoint}/api/tracks/{args.rj_id}?v=2"))
+        "children": orjson.loads(fast_curl(f"{args.endpoint}/api/tracks/{args.rj_id}?v=2"))
     }
 
     # 将目录结构转换为文件列表
@@ -240,12 +246,25 @@ def main(args: argparse.Namespace):
             # 获取文件下载链接
             url = file_info["mediaDownloadUrl"]
 
+            # 获取下载链接状态码，如果状态码不是 200，则尝试 mediaStreamUrl 作为备用下载链接
+            response_header = fast_curl(url, args=["--head"])
+            if int(response_header.splitlines()[0].split()[1]) != 200:
+                # 尝试 mediaStreamUrl 作为备用下载链接
+                url = file_info["mediaStreamUrl"]
+
+                # 如果 mediaStreamUrl 也不可用，则跳过下载
+                response_header = fast_curl(url, args=["--head"])
+                status_code = int(response_header.splitlines()[0].split()[1])
+                if status_code != 200:
+                    continue
+
             # 下载到临时文件
             try:
                 while download_temp_file.stat().st_size < file_info["size"]:
                     try:
-                        fast_get(url, save_to_file=download_temp_file, show_progress=True)
+                        fast_curl(url, save_to_file=download_temp_file, show_progress=True)
                     except subprocess.CalledProcessError:
+                        # 如果下载失败，可能是网络问题或链接失效，重试下载
                         pass
             except KeyboardInterrupt:
                 break
