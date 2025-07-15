@@ -176,7 +176,8 @@ def main(args: argparse.Namespace):
 
         # 使用 StringIO 来构建文件内容
         content = StringIO()
-        content.write("# 请在此文件中选择需要下载的文件，删除不需要的行\n# 然后保存并关闭编辑器\n\n")
+        content.write("# 每一行代表一个文件。注释行以 # 开头，不用管它们。\n")
+        content.write("# 请删除不想下载的文件，然后保存并关闭编辑器。\n\n")
 
         for path, info in files:
             if args.detail:
@@ -244,8 +245,8 @@ def main(args: argparse.Namespace):
                 while download_temp_file.stat().st_size < file_info["size"]:
                     try:
                         fast_get(url, save_to_file=download_temp_file, show_progress=True)
-                    except subprocess.CalledProcessError as e:
-                        print(f"下载文件 {file_path} 时出错: {e}")
+                    except subprocess.CalledProcessError:
+                        pass
             except KeyboardInterrupt:
                 break
             finally:
