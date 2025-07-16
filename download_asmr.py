@@ -17,12 +17,12 @@ import orjson
 
 def request_by_curl(
     url: str,
-    doh_url: str,
+    curl_path: pathlib.Path,
+    doh_url: Optional[str] = None,
     save_to_file: Optional[pathlib.Path] = None,
     show_progress: bool = False,
     proxy: Optional[str] = None,
     timeout: Optional[float] = None,
-    curl_path: Optional[pathlib.Path] = None,
     args: Optional[list[str]] = None
 ) -> bytes:
     """
@@ -30,30 +30,25 @@ def request_by_curl(
 
     Args:
         url: 要获取的 URL。
+        curl_path: curl 命令路径，如果为 None，则使用系统默认的 curl。
         doh_url: DoH URL，用于 DNS over HTTPS 查询。
         save_to_file: 如果指定，则将内容保存到该文件路径，否则输出到标准输出。
         show_progress: 是否显示下载进度条。
         proxy: 代理地址，格式为 {protocol}://{host}:{port}。
         timeout: 超时时间，单位为秒。
-        curl_path: curl 命令路径，如果为 None，则使用系统默认的 curl。
         args: 可选的其他 curl 参数。
 
     Returns:
         获取到的内容字节串。
     """
-    # 如果未指定 curl_path，则尝试使用 shutil.which 查找系统中的 curl 命令。
-    if curl_path is None:
-        curl_path = shutil.which("curl")
-
-    # 如果 curl_path 为 None 或不存在，则抛出异常。
-    if curl_path is None or not pathlib.Path(curl_path).exists():
-        raise FileNotFoundError(f"curl 文件（{curl_path}）未找到，请安装 curl 或指定其路径。")
-
     # 构建 curl 命令
-    cmd = [str(curl_path), "--http3", "--doh-url", doh_url, url]
+    cmd = [str(curl_path), "--http3", url]
 
-    # 如果指定了保存路径，则添加 -o 参数
-    # 否则，使用 -o - 将输出重定向到标准输出。
+    # 如果指定了 DoH URL，则添加 `--doh-url` 参数。
+    if doh_url:
+        cmd.extend(["--doh-url", doh_url])
+
+    # 如果指定了保存路径，则添加 `-o` 参数；否则，使用 `-o -` 将输出重定向到标准输出，并添加 `--continue-at -` 以支持断点续传。
     if save_to_file is not None:
         cmd.extend(["--output", str(save_to_file), "--continue-at", "-"])
     else:
@@ -132,8 +127,23 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
 
 
 def main(args: argparse.Namespace):
+    # 如果未指定 curl_path，则尝试使用 shutil.which 查找系统中的 curl 命令。
+    curl_path = args.curl_path
+    if curl_path is None:
+        curl_path = shutil.which("curl")
+
+        # 如果未找到 curl 命令，则抛出异常。
+        if curl_path is None:
+            raise FileNotFoundError("未找到 curl 命令，请安装 curl 或指定 --curl-path 参数。")
+
+        # 确保 curl_path 是 pathlib.Path 对象
+        curl_path = pathlib.Path(curl_path)
+    # 如果指定的 curl_path 不存在或不是一个文件，则抛出异常。
+    elif not curl_path.exists() or not curl_path.is_file():
+        raise FileNotFoundError(f"`{curl_path}` 不存在或不是一个文件。请检查路径是否正确。")
+
     # 使用 partial 函数预设参数，方便后续调用
-    fast_curl = partial(request_by_curl, doh_url=args.doh_url, proxy=args.proxy, timeout=args.timeout, curl_path=args.curl_path)
+    fast_curl = partial(request_by_curl, curl_path=args.curl_path, doh_url=args.doh_url, proxy=args.proxy, timeout=args.timeout)
 
     # 获取音声信息
     work_info = orjson.loads(fast_curl(f"{args.endpoint}/api/workInfo/{args.rj_id}"))
@@ -160,6 +170,10 @@ def main(args: argparse.Namespace):
     # 获取文本编辑器
     if args.editor_path:
         editor_path = args.editor_path
+
+        # 检测编辑器是否存在
+        if not editor_path.exists() or not editor_path.is_file():
+            raise FileNotFoundError(f"编辑器`{editor_path}`不存在或不是一个文件。请检查路径是否正确。")
     else:
         # 尝试使用系统默认的文本编辑器
         if editor_path := shutil.which("notepad"):
@@ -171,10 +185,6 @@ def main(args: argparse.Namespace):
 
         # 确保编辑器路径是 pathlib.Path 对象
         editor_path = pathlib.Path(editor_path)
-
-    # 检测编辑器是否存在
-    if not editor_path.exists():
-        raise FileNotFoundError(f"编辑器文件（{editor_path}）未找到，请安装编辑器或指定其路径。")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         # 将文件列表写入临时文件，然后打开notepad编辑，以询问哪个文件需要下载（像git commit一样）
