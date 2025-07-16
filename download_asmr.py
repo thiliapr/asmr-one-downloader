@@ -220,14 +220,19 @@ def main(args: argparse.Namespace):
 
         # 读取用户选择的文件列表
         with open(temp_file_path, "r", encoding="utf-8") as temp_file:
-            selected_files = [line.strip() for line in temp_file if line.strip() and not line.strip().startswith("#")]
+            # 这里没有用 not line.startswith("#") 来过滤注释行，是因为获取要下载的文件的逻辑是 set(user_selected_files) & set(files)
+            # set(user_selected_files) 表示用户想下载的文件列表，set(files) 表示有效的文件列表。
+            # 即使用户选择了无效的文件，因为交集操作会过滤掉无效的文件，所以最终下载的文件列表中不会包含无效的文件。
+            # `#`开头的行是注释行，可以看作是无效文件，但不影响正常下载。
+            # 而且如果有些文件以`#`开头，按照 not line.startswith("#") 过滤掉的话，用户就无法下载这些文件了。
+            user_selected_files = {line.strip() for line in temp_file if line.strip()}
 
     # 筛选出用户选择的文件
-    selected_files_data = [file for file in files if str(file[0]) in selected_files]
+    selected_files = [(path, info) for path, info in files if str(path) in user_selected_files]
 
     # 打印用户选择的文件路径
     print("将要下载的文件:")
-    for file_path, _ in selected_files_data:
+    for file_path, _ in selected_files:
         print(file_path)
     print()
 
@@ -235,7 +240,7 @@ def main(args: argparse.Namespace):
         download_temp_dir = pathlib.Path(download_temp_dir)
 
         # 下载用户选择的文件
-        for file_path, file_info in selected_files_data:
+        for file_path, file_info in selected_files:
             # 确保输出路径的父目录存在
             file_output_path = output_path / file_path
             file_output_path.parent.mkdir(parents=True, exist_ok=True)
