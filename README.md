@@ -1,6 +1,6 @@
 # asmr.one downloader
 ## 简介
-给出指定rj号，从<asmr.one>下载对应的音声。支持自动重连和断点下载。
+给出指定rj号，从![ASMR.ONE](https://asmr.one/)下载对应的音声。支持自动重连和断点下载。
 
 ## License
 ![GNU AGPL Version 3 Logo](https://www.gnu.org/graphics/agplv3-with-text-162x68.png)
@@ -10,12 +10,25 @@ asmr-one-downloader 是自由软件，遵循`Affero GNU 通用公共许可证第
 ## 安装依赖
 ```bash
 pip install -r requirements.txt
+
+# 打开浏览器，下载 curl
+firefox https://curl.se/download.html
+
+# 解压到 /path/to/curl，然后加入 PATH 或者手动在参数指定
+# 这里用 Windows 示范
+wget https://curl.se/windows/dl-8.14.1_2/curl-8.14.1_2-win64-mingw.zip -O curl.zip
+unzip curl.zip -d /path/to/curl/
+
+# 如果一切正常的话，应该会出现以下目录结构
+# /path/to/curl/curl-8.14.1_2-win64-mingw
+#   - bin
+#     - curl.exe
 ```
 
 ## 使用示例
 ```bash
 # 获取音声的文件清单
-python download_asmr.py 309477
+python download_asmr.py 309477 --curl-path /path/to/curl/curl-8.14.1_2-win64-mingw/bin/curl.exe
 
 # 输入后，等会你应该能看到一个文本编辑器窗口，要求你删除不想下载的项目（注：`#`开头的行为注释，不用管它）
 # 删完后，保存并退出编辑器，然后程序就会开始下载
