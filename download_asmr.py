@@ -109,7 +109,7 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
 
     Args:
         args: 可选的命令行参数列表。如果为 None，则使用 sys.argv[1:]。
-    
+
     Returns:
         解析后的命令行参数对象。
     """
@@ -143,7 +143,7 @@ def main(args: argparse.Namespace):
         raise FileNotFoundError(f"`{curl_path}` 不存在或不是一个文件。请检查路径是否正确。")
 
     # 使用 partial 函数预设参数，方便后续调用
-    fast_curl = partial(request_by_curl, curl_path=args.curl_path, doh_url=args.doh_url, proxy=args.proxy, timeout=args.timeout)
+    fast_curl = partial(request_by_curl, curl_path=curl_path, doh_url=args.doh_url, proxy=args.proxy, timeout=args.timeout)
 
     # 获取音声信息
     work_info = orjson.loads(fast_curl(f"{args.endpoint}/api/workInfo/{args.rj_id}"))
